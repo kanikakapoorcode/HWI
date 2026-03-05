@@ -1,16 +1,35 @@
-<img src="ques.png" width="500">
-# 🔐 Lock & Parity Problem – Solution Walkthrough
+# Lock & Parity Problem — Solution Walkthrough
 
-This repository contains a solution to the **Lock & Parity assignment problem**.
-The goal is to select valid key-lock assignments while minimizing the total cost and satisfying a **parity constraint**.
+<p align="center">
+<img src="./ques.png" width="600">
+</p>
 
-This README explains the thought process **from the most naive solution to the optimal approach**, just like a real problem-solving journey.
+This repository contains solutions to the **Lock & Parity assignment problem** implemented in C++.
+The goal is to determine a valid set of key-lock assignments that minimizes the total cost while satisfying a parity constraint.
+
+The README explains the **problem understanding and the evolution of solutions**, starting from a naive brute force approach and progressing toward an optimized solution.
 
 ---
 
-# 📘 Problem Summary
+# Table of Contents
 
-You are given **N locks** arranged in a row.
+1. Problem Summary
+2. Constraints
+3. Assignment Rules
+4. Parity Constraint
+5. Approach 1 — Brute Force
+6. Approach 2 — Backtracking
+7. Approach 3 — Observing Parity Properties
+8. Approach 4 — Greedy Insight
+9. Approach 5 — Optimized Solution
+10. Complexity Analysis
+11. Repository Structure
+
+---
+
+# Problem Summary
+
+You are given **N locks arranged in a row (1-indexed)**.
 
 Each lock `i` has a value:
 
@@ -20,133 +39,123 @@ L[i]
 
 Each lock also has **a key underneath it**.
 
-A key from position `j` can unlock lock `i` if:
+A key from position `j` can unlock lock `i` if the following conditions are satisfied:
 
 ```
 j < i
 L[j] ≠ L[i]
 ```
 
-The **cost** of assigning key `j` to lock `i` is:
+The **cost of assigning key j to lock i** is defined as:
 
 ```
 |L[j] − L[i]|
 ```
 
+Your task is to select a valid set of assignments such that the **total cost is minimized**.
+
 ---
 
-# ⚠️ Constraints
+# Constraints
 
 ```
 1 ≤ N ≤ 200
-1 ≤ L[i] ≤ 10^5
+1 ≤ L[i] ≤ 100000
 ```
 
-Rules:
+Additional restrictions:
 
-* Each **key used at most once**
-* Each **lock assigned at most once**
-* At least **one assignment must exist**
+* Each key can be used **at most once**
+* Each lock can be assigned **at most once**
+* At least **one assignment must be selected**
 
 ---
 
-# ⚖️ Parity Rule
+# Assignment Rules
 
-After selecting assignments:
+A valid assignment must satisfy:
+
+1. Direction constraint
 
 ```
-even_edges ≥ odd_edges
+j < i
 ```
 
-Where
+A key can only unlock locks positioned **to its right**.
+
+2. Value constraint
+
+```
+L[j] ≠ L[i]
+```
+
+Assignments between locks with identical values are not allowed.
+
+3. Cost definition
+
+```
+cost = |L[j] − L[i]|
+```
+
+---
+
+# Parity Constraint
+
+After selecting all assignments, the following condition must hold:
+
+```
+number_of_even_cost_edges ≥ number_of_odd_cost_edges
+```
+
+Definitions:
 
 ```
 even edge → cost is even
 odd edge  → cost is odd
 ```
 
-Examples:
+Examples of valid selections:
 
-| even | odd | valid |
+| Even | Odd | Valid |
 | ---- | --- | ----- |
-| 1    | 0   | ✅     |
-| 1    | 1   | ✅     |
-| 2    | 1   | ✅     |
-| 0    | 1   | ❌     |
-| 0    | 2   | ❌     |
+| 1    | 0   | Yes   |
+| 1    | 1   | Yes   |
+| 2    | 1   | Yes   |
+| 0    | 1   | No    |
+| 0    | 2   | No    |
 
-Goal:
+If no valid assignment set exists, the output should be:
 
 ```
-Minimize total assignment cost
+-1
 ```
-
-Return **-1** if no valid assignment exists.
 
 ---
 
-# 🧠 Approach 1 — Extreme Naive (Brute Force)
+# Approach 1 — Brute Force (Conceptual)
 
 Idea:
 
-1. Generate all possible assignments.
-2. Try **every possible subset of assignments**.
-3. Check:
+1. Generate every possible valid assignment `(j, i)`
+2. Enumerate **all subsets** of assignments
+3. For each subset check:
 
-   * keys not reused
-   * locks not reused
-   * parity rule satisfied
-4. Compute minimum cost.
+   * keys are not reused
+   * locks are not reused
+   * parity rule is satisfied
+4. Track the minimum cost.
 
-### Why it works
+Although this guarantees correctness, it is computationally infeasible.
 
-This explores **every possible combination**.
-
-### Why it fails
-
-Number of edges can reach ~20,000.
-
-Total subsets:
+Total possible subsets:
 
 ```
-2^20000
+2^E
 ```
 
-This is **computationally impossible**.
+Where `E` is the number of edges (assignments).
 
-### Complexity
-
-```
-Time: O(2^E)
-```
-
-Where `E` = number of possible edges.
-
----
-
-# 🧠 Approach 2 — Backtracking Matching
-
-We improve brute force by:
-
-* choosing edges recursively
-* skipping invalid states early
-
-We maintain:
-
-```
-used_keys[]
-used_locks[]
-even_count
-odd_count
-```
-
-At every step we:
-
-1. Pick an unused edge
-2. Add it to the assignment
-3. Continue recursively
-
-Still, worst case remains exponential.
+Worst-case `E` can reach nearly `N²`.
 
 ### Complexity
 
@@ -154,25 +163,65 @@ Still, worst case remains exponential.
 O(2^E)
 ```
 
-Still too slow.
+This approach becomes impossible even for small values of `N`.
+
+Implementation available in:
+
+```
+brute.cpp
+```
 
 ---
 
-# 🧠 Approach 3 — Observing the Parity Rule
+# Approach 2 — Backtracking
 
-The key insight:
+A refinement of brute force uses recursion and pruning.
+
+During recursion we maintain:
+
+```
+used_keys[]
+used_locks[]
+even_count
+odd_count
+current_cost
+```
+
+Steps:
+
+1. Select an unused assignment
+2. Mark key and lock as used
+3. Update parity counts
+4. Recurse to explore further assignments
+5. Backtrack
+
+Although pruning removes some invalid states early, the worst-case complexity remains exponential.
+
+### Complexity
+
+```
+O(2^E)
+```
+
+Still not suitable for the given constraints.
+
+---
+
+# Approach 3 — Observing the Parity Rule
+
+The main constraint is:
 
 ```
 even_edges ≥ odd_edges
 ```
 
-Meaning:
+Important observations:
 
-* odd edges alone ❌
-* even edges alone ✅
-* odd edges need even edges to balance them
+* Odd edges alone cannot form a valid solution
+* Even edges alone always satisfy the constraint
+* Odd edges must be balanced by even edges
 
-Examples of valid sets:
+Valid patterns include:
 
 ```
 1 even
@@ -181,164 +230,90 @@ Examples of valid sets:
 2 even + 2 odd
 ```
 
-This means **even edges stabilize odd edges**.
+This insight significantly reduces the search space.
 
 ---
 
-# 🧠 Approach 4 — Greedy Insight
+# Approach 4 — Greedy Insight
 
-Instead of testing assignments, we observe:
-
-A **single even edge** already satisfies:
+A **single even edge** already satisfies the constraint:
 
 ```
 even = 1
 odd  = 0
 ```
 
-Which is valid.
+Therefore, the smallest valid solution could simply be the **minimum even-cost edge**.
 
-So the smallest valid solution could be:
-
-```
-minimum even cost edge
-```
-
-But sometimes combining edges may also work.
-
-Example:
+However, combinations such as:
 
 ```
 1 even + 1 odd
 ```
 
+might sometimes produce a smaller total cost depending on edge values.
+
+This motivates evaluating small balanced combinations.
+
 ---
 
-# 🧠 Approach 5 — Practical Optimal Solution
+# Approach 5 — Optimized Solution
 
 Steps:
 
-### 1️⃣ Generate all valid edges
+### 1. Generate all valid assignments
 
-For all `j < i`:
+For all pairs:
 
 ```
-if L[j] ≠ L[i]
+j < i
+L[j] ≠ L[i]
 cost = |L[j] − L[i]|
 ```
 
----
-
-### 2️⃣ Separate edges by parity
+### 2. Separate costs by parity
 
 ```
-even_costs[]
-odd_costs[]
+even_costs
+odd_costs
 ```
 
----
-
-### 3️⃣ Sort both lists
+### 3. Sort both lists
 
 ```
-sort(even)
-sort(odd)
+sort(even_costs)
+sort(odd_costs)
 ```
 
----
+### 4. Evaluate valid combinations
 
-### 4️⃣ Try valid combinations
-
-Check:
+Possible candidate solutions:
 
 ```
 1 even
 1 even + 1 odd
 2 even + 2 odd
+3 even + 3 odd
 ...
 ```
 
-Maintain:
+For each candidate combination ensure:
 
 ```
 even ≥ odd
 ```
 
-Track the minimum cost.
+Compute the minimum achievable cost.
 
----
+Implementation available in:
 
-# 💻 Final C++ Implementation
-
-```cpp
-#include <bits/stdc++.h>
-using namespace std;
-
-int main() {
-
-    int N;
-    cin >> N;
-
-    vector<int> L(N);
-    for(int i = 0; i < N; i++)
-        cin >> L[i];
-
-    vector<int> even, odd;
-
-    for(int j = 0; j < N; j++) {
-        for(int i = j + 1; i < N; i++) {
-
-            if(L[j] == L[i]) continue;
-
-            int cost = abs(L[j] - L[i]);
-
-            if(cost % 2 == 0)
-                even.push_back(cost);
-            else
-                odd.push_back(cost);
-        }
-    }
-
-    sort(even.begin(), even.end());
-    sort(odd.begin(), odd.end());
-
-    long long ans = LLONG_MAX;
-
-    if(!even.empty())
-        ans = min(ans, (long long)even[0]);
-
-    if(!even.empty() && !odd.empty())
-        ans = min(ans, (long long)even[0] + odd[0]);
-
-    int k = min(even.size(), odd.size());
-
-    for(int i = 1; i <= k; i++) {
-
-        if(i < even.size()) {
-
-            long long sum = 0;
-
-            for(int j = 0; j < i; j++)
-                sum += odd[j];
-
-            for(int j = 0; j < i; j++)
-                sum += even[j];
-
-            ans = min(ans, sum);
-        }
-    }
-
-    if(ans == LLONG_MAX)
-        cout << -1;
-    else
-        cout << ans;
-
-}
+```
+optimal_sol.cpp
 ```
 
 ---
 
-# ⏱ Complexity
+# Complexity Analysis
 
 Generating edges:
 
@@ -346,53 +321,49 @@ Generating edges:
 O(N²)
 ```
 
-Sorting:
+Sorting edge lists:
 
 ```
 O(E log E)
 ```
 
-Where
+Where:
 
 ```
 E ≤ N²
 ```
 
-For `N = 200`, this runs comfortably.
+With `N ≤ 200`, this solution runs comfortably within limits.
 
 ---
 
-# 🌟 Final Insight
-
-Odd assignments introduce imbalance.
-Even assignments restore balance.
-
-The optimal solution carefully chooses assignments so that:
+# Repository Structure
 
 ```
-imbalance never exceeds stability
-```
-
-Which is exactly the rule:
-
-```
-even_edges ≥ odd_edges
-```
-
----
-
-# 📂 Repository Structure
-
-```
-lock-parity-problem/
+problem-3Lock&Parity/
 │
-├── solution.cpp
-├── README.md
-└── testcases.txt
+├── brute.cpp
+├── optimal_sol.cpp
+├── ques.png
+└── README.md
+```
+
+File descriptions:
+
+```
+brute.cpp        : conceptual brute force implementation
+optimal_sol.cpp  : optimized implementation used for final solution
+ques.png         : problem statement image
+README.md        : detailed explanation of approaches
 ```
 
 ---
 
-# 🚀 Author
+# Conclusion
 
-Implemented as part of **algorithmic problem solving practice** and uploaded to GitHub for reference and learning.
+The key challenge in this problem lies in balancing **cost minimization** with the **parity constraint**.
+
+Initial brute-force approaches explore all possibilities but are computationally infeasible.
+By analyzing the parity property of assignments, we can significantly reduce the search space and derive an efficient solution.
+
+The final algorithm efficiently evaluates feasible combinations of even and odd edges and computes the minimum valid assignment cost.
